@@ -32,7 +32,16 @@ trap cleanup EXIT TERM INT
 
 echo $$ > "$STATE_FILE.spinner-pid"
 
+check_counter=0
+
 while true; do
+  # Every ~50 iterations (~5s when spinning), verify pane still exists
+  check_counter=$(( (check_counter + 1) % 50 ))
+  if [ "$check_counter" -eq 0 ]; then
+    if ! tmux display-message -p -t "$TMUX_PANE" "#{pane_id}" > /dev/null 2>&1; then
+      cleanup
+    fi
+  fi
   mode="spin"
   if [ -f "$STATE_FILE.spinner-mode" ]; then
     mode=$(cat "$STATE_FILE.spinner-mode" 2>/dev/null || echo "spin")

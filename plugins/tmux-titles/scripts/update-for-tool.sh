@@ -13,7 +13,7 @@ script_dir="$(command cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 tool_name=$(echo "$json" | jq --raw-output '.tool_name')
 
 case "$tool_name" in
-  Bash)           icon='$' ;;
+  Bash)           icon='▶' ;;
   Create|Edit|Write|MultiEdit) icon='✎' ;;
   Read)           icon='…' ;;
   AskUserQuestion) icon='?' ;;
