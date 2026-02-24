@@ -32,6 +32,10 @@ else
   # First run: capture the original window name before we modify it
   if [ ! -f "$state_file.original-name" ]; then
     original=$(tmux display-message -p -t "$target" "#{window_name}" 2>/dev/null || echo "")
+    # Discard unhelpful defaults: version numbers, "claude", "Claude Code", shell names
+    if echo "$original" | grep -qiE '^[0-9]+\.[0-9]+|^claude|^zsh$|^bash$|^fish$'; then
+      original=""
+    fi
     if [ -n "$original" ]; then
       echo "$original" > "$state_file.original-name"
     fi
@@ -39,9 +43,9 @@ else
   if [ -f "$state_file.original-name" ]; then
     base_name=$(cat "$state_file.original-name")
   elif [ -n "$cwd" ]; then
-    base_name=$(basename "$cwd")
+    base_name="🦞 $(basename "$cwd")"
   else
-    base_name="claude"
+    base_name="🦞"
   fi
 fi
 
