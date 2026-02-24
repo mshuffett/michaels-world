@@ -7,11 +7,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/persist-tmux-pane.sh",
-            "timeout": 500
-          },
-          {
-            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/scripts/update-status.sh \"○\"",
             "timeout": 500
           }
