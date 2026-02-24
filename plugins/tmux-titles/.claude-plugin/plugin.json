@@ -1,0 +1,9 @@
+{
+  "name": "tmux-titles",
+  "description": "Smart tmux window and pane titles with status icons, AI-generated descriptive names, and multi-pane awareness",
+  "version": "0.1.0",
+  "license": "MIT",
+  "author": {
+    "name": "Michael Shuffett"
+  }
+}
