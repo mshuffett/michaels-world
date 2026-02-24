@@ -7,6 +7,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "[ -n \"$CLAUDE_ENV_FILE\" ] && echo 'export CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1' >> \"$CLAUDE_ENV_FILE\"",
+            "timeout": 500
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/scripts/update-status.sh \"○\"",
             "timeout": 500
           }

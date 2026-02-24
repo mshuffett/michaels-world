@@ -25,17 +25,30 @@ state_dir="/tmp/claude-tmux-titles"
 mkdir -p "$state_dir"
 state_file="$state_dir/$(echo "$TMUX_PANE" | tr '%' '_')"
 
-# Read saved descriptive name for this pane, fall back to directory basename
+# Read saved descriptive name for this pane, fall back to original window name
 if [ -f "$state_file.name" ]; then
   base_name=$(cat "$state_file.name")
-elif [ -n "$cwd" ]; then
-  base_name=$(basename "$cwd")
 else
-  base_name="claude"
+  # First run: capture the original window name before we modify it
+  if [ ! -f "$state_file.original-name" ]; then
+    original=$(tmux display-message -p -t "$target" "#{window_name}" 2>/dev/null || echo "")
+    if [ -n "$original" ]; then
+      echo "$original" > "$state_file.original-name"
+    fi
+  fi
+  if [ -f "$state_file.original-name" ]; then
+    base_name=$(cat "$state_file.original-name")
+  elif [ -n "$cwd" ]; then
+    base_name=$(basename "$cwd")
+  else
+    base_name="claude"
+  fi
 fi
 
 # Start spinner if not already running
 if [ ! -f "$state_file.spinner-pid" ] || ! kill -0 "$(cat "$state_file.spinner-pid" 2>/dev/null)" 2>/dev/null; then
+  # Prevent Claude CLI from overriding pane title via escape sequences
+  tmux set-option -p -t "$TMUX_PANE" allow-rename off 2>/dev/null || true
   script_dir="$(command cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   nohup "$script_dir/spinner.sh" "$TMUX_PANE" > /dev/null 2>&1 &
   disown
@@ -72,6 +85,7 @@ echo "$priority $indicator" > "$state_file.status"
 best_priority=0
 best_indicator=""
 best_name=""
+best_pane=""
 
 pane_ids=$(tmux list-panes -t "$target" -F '#{pane_id}' 2>/dev/null || echo "")
 
@@ -83,9 +97,13 @@ for pane_id in $pane_ids; do
     if [ "$p" -gt "$best_priority" ]; then
       best_priority=$p
       best_indicator=$icon
+      best_pane=$pane_id
       pane_name_file="$state_dir/$(echo "$pane_id" | tr '%' '_').name"
+      pane_orig_file="$state_dir/$(echo "$pane_id" | tr '%' '_').original-name"
       if [ -f "$pane_name_file" ]; then
         best_name=$(cat "$pane_name_file")
+      elif [ -f "$pane_orig_file" ]; then
+        best_name=$(cat "$pane_orig_file")
       fi
     fi
   fi
@@ -97,6 +115,12 @@ fi
 if [ -z "$best_name" ]; then
   best_name="$base_name"
 fi
+if [ -z "$best_pane" ]; then
+  best_pane="$TMUX_PANE"
+fi
 
-# Set window name to highest-priority pane's status
-tmux rename-window -t "$target" "$best_indicator $best_name"
+# Record which pane owns the window name (for spinner to use)
+window_key=$(echo "$target" | tr ':' '_')
+echo "$best_pane" > "$state_dir/window-${window_key}.owner"
+
+# The spinner will handle the animated window name; no static rename needed here
