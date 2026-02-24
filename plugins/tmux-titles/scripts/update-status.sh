@@ -1,11 +1,10 @@
 #!/bin/bash
 set -Eeuo pipefail
 
-# Updates pane title and bubbles up to window name based on priority.
-#
-# Always sets the pane title for this Claude pane.
-# For the window name: finds the highest-priority Claude status across all
-# panes in the window and uses that as the window title.
+# Bubbles up Claude status to the window name based on priority.
+# Controls the background spinner for pane title animation.
+# When Claude is active: spinner animates in pane border.
+# When Claude stops: static icon shown.
 
 json=$(cat)
 indicator="${1:-}"
@@ -20,7 +19,7 @@ if [ -z "$target" ]; then
   exit 0
 fi
 
-# Get the descriptive name (set by maybe-generate-title.sh) or fall back to directory
+# State directory
 cwd=$(echo "$json" | jq --raw-output '.cwd // empty' 2>/dev/null || echo "")
 state_dir="/tmp/claude-tmux-titles"
 mkdir -p "$state_dir"
@@ -35,10 +34,26 @@ else
   base_name="claude"
 fi
 
-# 1. Always set per-pane title
-tmux select-pane -t "$TMUX_PANE" -T "$indicator $base_name"
+# Start spinner if not already running
+if [ ! -f "$state_file.spinner-pid" ] || ! kill -0 "$(cat "$state_file.spinner-pid" 2>/dev/null)" 2>/dev/null; then
+  script_dir="$(command cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  nohup "$script_dir/spinner.sh" "$TMUX_PANE" > /dev/null 2>&1 &
+  disown
+fi
 
-# 2. Save this pane's priority for bubble-up
+# Set spinner mode based on indicator
+# Active states get the animated spinner, terminal states get static icon
+case "$indicator" in
+  '✓'|'○'|'?')
+    echo "static" > "$state_file.spinner-mode"
+    echo "$indicator" > "$state_file.spinner-icon"
+    ;;
+  *)
+    echo "spin" > "$state_file.spinner-mode"
+    ;;
+esac
+
+# Save this pane's priority for bubble-up
 # Priority: ? (10) > ✻ (8) > $ (7) > ✎ (6) > … (5) > ⌫ (4) > ○ (3) > ✓ (2)
 case "$indicator" in
   '?') priority=10 ;;
@@ -53,12 +68,11 @@ case "$indicator" in
 esac
 echo "$priority $indicator" > "$state_file.status"
 
-# 3. Bubble up: find highest-priority Claude pane in this window
+# Bubble up: find highest-priority Claude pane in this window
 best_priority=0
 best_indicator=""
 best_name=""
 
-# Get all pane IDs in this window
 pane_ids=$(tmux list-panes -t "$target" -F '#{pane_id}' 2>/dev/null || echo "")
 
 for pane_id in $pane_ids; do
@@ -69,7 +83,6 @@ for pane_id in $pane_ids; do
     if [ "$p" -gt "$best_priority" ]; then
       best_priority=$p
       best_indicator=$icon
-      # Use that pane's name
       pane_name_file="$state_dir/$(echo "$pane_id" | tr '%' '_').name"
       if [ -f "$pane_name_file" ]; then
         best_name=$(cat "$pane_name_file")
@@ -78,7 +91,6 @@ for pane_id in $pane_ids; do
   fi
 done
 
-# Fall back to current pane's info if nothing better found
 if [ -z "$best_indicator" ]; then
   best_indicator="$indicator"
 fi
@@ -86,5 +98,5 @@ if [ -z "$best_name" ]; then
   best_name="$base_name"
 fi
 
-# 4. Set window name to highest-priority pane's status
+# Set window name to highest-priority pane's status
 tmux rename-window -t "$target" "$best_indicator $best_name"

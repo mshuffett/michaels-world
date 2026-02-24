@@ -5,16 +5,24 @@ if [ -z "${TMUX:-}" ] || [ -z "${TMUX_PANE:-}" ]; then
   exit 0
 fi
 
-# Clean up state files for this pane
+# Kill the spinner process
 state_dir="/tmp/claude-tmux-titles"
 state_file="$state_dir/$(echo "$TMUX_PANE" | tr '%' '_')"
-rm -f "$state_file.status" "$state_file.name"
+
+if [ -f "$state_file.spinner-pid" ]; then
+  pid=$(cat "$state_file.spinner-pid" 2>/dev/null || echo "")
+  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null || true
+  fi
+fi
+
+# Clean up all state files for this pane
+rm -f "$state_file.status" "$state_file.name" "$state_file.spinner-pid" "$state_file.spinner-mode" "$state_file.spinner-icon"
 
 # Reset pane title
 tmux select-pane -t "$TMUX_PANE" -T "" 2>/dev/null || true
 
-# If other Claude panes remain in this window, let them own the window name.
-# Otherwise, re-enable automatic-rename so tmux takes over.
+# If no other Claude panes remain, re-enable automatic-rename
 target=$(tmux display-message -p -t "$TMUX_PANE" "#{session_id}:#{window_id}" 2>/dev/null || echo "")
 if [ -z "$target" ]; then
   exit 0
@@ -33,6 +41,5 @@ for pane_id in $pane_ids; do
 done
 
 if [ "$has_other_claude" = false ]; then
-  # No other Claude panes — let tmux auto-rename again
   tmux set-window-option -t "$target" automatic-rename on 2>/dev/null || true
 fi

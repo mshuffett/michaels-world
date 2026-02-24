@@ -117,8 +117,5 @@ else
   current_icon="✻"
 fi
 
-# Update pane title
-tmux select-pane -t "$TMUX_PANE" -T "$current_icon $title"
-
-# Update window (bubble-up will use new name)
+# Update window name (pane title is owned by the spinner process)
 tmux rename-window -t "$target" "$current_icon $title"
