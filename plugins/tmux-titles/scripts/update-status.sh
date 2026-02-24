@@ -36,17 +36,17 @@ else
     if echo "$original" | grep -qiE '^[0-9]+\.[0-9]+|^claude|^zsh$|^bash$|^fish$'; then
       original=""
     fi
-    if [ -n "$original" ]; then
-      echo "$original" > "$state_file.original-name"
+    # Use original if meaningful, otherwise fall back to 🦞 dirname
+    if [ -z "$original" ]; then
+      if [ -n "$cwd" ]; then
+        original="🦞 $(basename "$cwd")"
+      else
+        original="🦞"
+      fi
     fi
+    echo "$original" > "$state_file.original-name"
   fi
-  if [ -f "$state_file.original-name" ]; then
-    base_name=$(cat "$state_file.original-name")
-  elif [ -n "$cwd" ]; then
-    base_name="🦞 $(basename "$cwd")"
-  else
-    base_name="🦞"
-  fi
+  base_name=$(cat "$state_file.original-name")
 fi
 
 # Start spinner if not already running
